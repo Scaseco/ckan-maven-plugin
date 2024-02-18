@@ -64,6 +64,10 @@ import eu.trentorise.opendata.jackan.model.CkanDataset;
 import eu.trentorise.opendata.jackan.model.CkanResource;
 import eu.trentorise.opendata.jackan.model.CkanTag;
 
+/**
+ * The Maven Old Java Object (MOJO) that implements the goal for
+ * uploading files to CKAN.
+ */
 @Mojo(name = "upload", defaultPhase = LifecyclePhase.DEPLOY)
 public class CkanUploadMojo extends AbstractMojo {
 
@@ -93,6 +97,7 @@ public class CkanUploadMojo extends AbstractMojo {
     @Parameter(property = "ckan.resourceId", required = true)
     private String resourceId;
 
+    @Override
     public void execute() throws MojoExecutionException {
         File file = new File(fileName);
         if (!file.exists()) {
@@ -188,7 +193,9 @@ public class CkanUploadMojo extends AbstractMojo {
     }
 
 
-
+    /**
+     * Deployment of a file as a CKAN resource.
+     */
     public static void deploy(CkanClient ckanClient, String rawDatasetName, boolean noFileUpload, String targetOrgaId, String resourceId, Path file) throws IOException {
         // String rawDatasetName = DcatDataset.getLabel(datasetId);
 
@@ -416,12 +423,12 @@ public class CkanUploadMojo extends AbstractMojo {
     }
 
     /**
-     * Create or update the appropriate resource among the ones in a given dataset
+     * Create or update the appropriate resource among the ones in a given dataset.
      *
-     * @param ckanClient
-     * @param dataset
-     * @param res
-     * @throws IOException
+     * @param ckanClient The CKAN client instance.
+     * @param ckanDataset The CKAN dataset object.
+     * @param resourceId The identifier of the resource to create or update.
+     * @return The CkanResource instance for the created or updated resource.
      */
     public static CkanResource createOrUpdateResource(CkanClient ckanClient, CkanDataset ckanDataset, String resourceId) {
         Multimap<String, CkanResource> nameToCkanResources = Multimaps.index(
@@ -486,12 +493,13 @@ public class CkanUploadMojo extends AbstractMojo {
     /**
      * Upload a file to an *existing* record
      *
-     * @param ckanClient
-     * @param datasetName
-     * @param resourceId
-     * @param isResourceCreationRequired
-     * @param srcFilename
-     * @return
+     * @param ckanClient The CKAN client instance.
+     * @param datasetName The name of the CKAN dataset to which to upload the file.
+     * @param resourceId The name of the resource to which to upload the dataset (w.r.t. to the dataset).
+     * @param srcFilename The filename what to upload.
+     * @param contentType The content type for the upload.
+     * @param downloadFilename The name under which the uploaded file will be available for download.
+     * @return The CkanResource for the create or updated upload.
      */
     public static CkanResource uploadFile(
             CkanClient ckanClient,
@@ -564,6 +572,7 @@ public class CkanUploadMojo extends AbstractMojo {
         }
     }
 
+    /** Convert a URI to a PATH - if possible. */
     public static Optional<Path> pathsGet(URI uri) {
         Optional<Path> result;
         try {
@@ -574,5 +583,4 @@ public class CkanUploadMojo extends AbstractMojo {
         }
         return result;
     }
-
 }
