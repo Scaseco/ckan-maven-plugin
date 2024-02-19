@@ -3,7 +3,7 @@ A maven plugin to upload artifacts to CKAN
 
 ## Usage
 
-* **Step 1:** Register the server password in your `~/.m2/settings.xml`.
+* **Step 1:** Register the server password in your `$HOME/.m2/settings.xml` file.
 It is strongly advised to [encrypt your passwords](https://maven.apache.org/guides/mini/guide-encryption.html) in this file.
 
 ```xml
