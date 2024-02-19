@@ -24,7 +24,8 @@
 
 	<scm>
 		<connection>scm:git:git@github.com:Scaseco/sparql-maven-plugin.git</connection>
-		<developerConnection>scm:git:git@github.com:Scaseco/sparql-maven-plugin.git</developerConnection>
+		<developerConnection>
+			scm:git:git@github.com:Scaseco/sparql-maven-plugin.git</developerConnection>
 		<url>https://github.com/Scaseco/sparql-maven-plugin.git</url>
 		<tag>HEAD</tag>
 	</scm>
@@ -54,14 +55,15 @@
 		<maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
 		<maven-surefire-plugin.version>3.2.2</maven-surefire-plugin.version>
 		<maven-release-plugin.version>3.0.1</maven-release-plugin.version>
-		<!-- <maven-changes-plugin.version>3.0.0-pre-HSCBT</maven-changes-plugin.version> -->
+		<!--
+		<maven-changes-plugin.version>3.0.0-pre-HSCBT</maven-changes-plugin.version> -->
 		<maven-changes-plugin.version>2.12.1</maven-changes-plugin.version>
 		<maven-project-info-reports-plugin.version>3.0.0</maven-project-info-reports-plugin.version>
 		<maven-scm-publish-plugin.version>3.0.0</maven-scm-publish-plugin.version>
 		<maven-site-plugin.version>3.8.2</maven-site-plugin.version>
-                <maven-gpg-plugin.version>3.1.0</maven-gpg-plugin.version>
+		<maven-gpg-plugin.version>3.1.0</maven-gpg-plugin.version>
 
-                <nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
+		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
 	</properties>
 
 	<prerequisites>
@@ -366,15 +368,22 @@
 			<scope>${maven-api.scope}</scope>
 		</dependency>
 
-                <!-- Implementation -->
+		<!-- Implementation -->
 		<dependency>
 			<groupId>eu.trentorise.opendata</groupId>
 			<artifactId>jackan</artifactId>
 			<version>${jackan.version}</version>
 		</dependency>
+
+		<!-- Experimental; may be dropped or go to a different plugin -->
+<!--		<dependency>-->
+<!--			<groupId>org.apache.maven.wagon</groupId>-->
+<!--			<artifactId>wagon-provider-api</artifactId>-->
+<!--			<version>3.5.3</version>-->
+<!--		</dependency>-->
 	</dependencies>
 
-	
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -386,7 +395,7 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
-	
+
 	<distributionManagement>
 		<repository>
 			<id>maven.aksw.internal</id>

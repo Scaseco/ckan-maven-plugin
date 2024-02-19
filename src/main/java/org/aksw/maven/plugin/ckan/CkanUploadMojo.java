@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.aksw.maven.plugin.sparql;
+package org.aksw.maven.plugin.ckan;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,9 +28,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.License;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
@@ -38,13 +39,12 @@ import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
 import org.apache.maven.settings.Server;
 import org.apache.maven.settings.Settings;
 import org.apache.maven.settings.crypto.DefaultSettingsDecryptionRequest;
 import org.apache.maven.settings.crypto.SettingsDecrypter;
 import org.apache.maven.settings.crypto.SettingsDecryptionResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -78,6 +78,9 @@ public class CkanUploadMojo extends AbstractMojo {
     @Parameter(defaultValue = "${settings}", readonly = true)
     private Settings settings;
 
+    @Parameter(defaultValue="${project}", readonly=true, required=true)
+    private MavenProject project;
+
     @Component
     private SettingsDecrypter decrypter;
 
@@ -107,6 +110,14 @@ public class CkanUploadMojo extends AbstractMojo {
 
     @Parameter(property = "ckan.author", required = false)
     private String author;
+
+//    @Parameter(property = "ckan.version", defaultValue = "${project.version}", required = true)
+//    private String version;
+
+
+    public CkanUploadMojo() {
+        super();
+    }
 
     @Override
     public void execute() throws MojoExecutionException {
@@ -139,6 +150,16 @@ public class CkanUploadMojo extends AbstractMojo {
      */
     public void doDeploy(CkanClient ckanClient, Path file) throws IOException {
         Log logger = getLog();
+
+        /*
+        for (Artifact artifact : project.getAttachedArtifacts()) {
+            artifact.getGroupId();
+            artifact.getArtifactId();
+            artifact.getVersion();
+            artifact.getType();
+            artifact.getClassifier();
+        }
+        */
 
         String datasetName = datasetId
                 .replace(":", "-")
@@ -176,6 +197,25 @@ public class CkanUploadMojo extends AbstractMojo {
         }
 
         remoteCkanDataset.setAuthor(author);
+        remoteCkanDataset.setVersion(project.getVersion());
+
+        List<License> licenses = project.getLicenses();
+        if (!licenses.isEmpty()) {
+            if (licenses.size() > 1) {
+                if (logger.isWarnEnabled()) {
+                    logger.warn("More than 1 license found. Using only the first.");
+                }
+            }
+
+            License license = licenses.get(0);
+            remoteCkanDataset.setLicenseId(license.getName());
+            remoteCkanDataset.setLicenseUrl(license.getUrl());
+            // XXX remoteCkanDataset.setLicenseTitle();
+        }
+
+        remoteCkanDataset.setNotes(project.getDescription());
+
+
 
         if (ckanOrg != null) {
             remoteCkanDataset.setOrganization(ckanOrg);
