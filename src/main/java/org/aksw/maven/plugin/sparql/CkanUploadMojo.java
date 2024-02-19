@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -61,6 +62,7 @@ import eu.trentorise.opendata.jackan.internal.org.apache.http.entity.mime.conten
 import eu.trentorise.opendata.jackan.internal.org.apache.http.impl.client.CloseableHttpClient;
 import eu.trentorise.opendata.jackan.internal.org.apache.http.impl.client.HttpClientBuilder;
 import eu.trentorise.opendata.jackan.model.CkanDataset;
+import eu.trentorise.opendata.jackan.model.CkanOrganization;
 import eu.trentorise.opendata.jackan.model.CkanResource;
 import eu.trentorise.opendata.jackan.model.CkanTag;
 
@@ -71,7 +73,7 @@ import eu.trentorise.opendata.jackan.model.CkanTag;
 @Mojo(name = "upload", defaultPhase = LifecyclePhase.DEPLOY)
 public class CkanUploadMojo extends AbstractMojo {
 
-    private static final Logger logger = LoggerFactory.getLogger(CkanUploadMojo.class);
+    // private static final Logger logger = LoggerFactory.getLogger(CkanUploadMojo.class);
 
     @Parameter(defaultValue = "${settings}", readonly = true)
     private Settings settings;
@@ -91,11 +93,20 @@ public class CkanUploadMojo extends AbstractMojo {
     @Parameter(property = "ckan.fileName", required = true)
     private String fileName;
 
+    @Parameter(property = "ckan.downloadFileName", required = false)
+    private String downloadFileName;
+
     @Parameter(property = "ckan.datasetId", required = true)
     private String datasetId;
 
-    @Parameter(property = "ckan.resourceId", required = true)
+    @Parameter(property = "ckan.resourceId", defaultValue = "${project.artifactId}", required = true)
     private String resourceId;
+
+    @Parameter(property = "ckan.organizationId", required = false)
+    private String organizationId;
+
+    @Parameter(property = "ckan.author", required = false)
+    private String author;
 
     @Override
     public void execute() throws MojoExecutionException {
@@ -106,107 +117,40 @@ public class CkanUploadMojo extends AbstractMojo {
 
         try {
             Server server = settings.getServer(serverId);
-            // if (server != null) {
-            SettingsDecryptionResult result = decrypter.decrypt(new DefaultSettingsDecryptionRequest(server));
-            server = result.getServer();
 
-            // Assuming the API key is stored in the password field
-            String apiKey = server.getPassword();
+            String apiKey = null;
+            if (server != null) {
+                SettingsDecryptionResult result = decrypter.decrypt(new DefaultSettingsDecryptionRequest(server));
+                server = result.getServer();
+                // Assuming the API key is stored in the password field
+                apiKey = server.getPassword();
+            }
 
-            // uploadFileToCkan(file);
             CkanClient ckanClient = new CkanClient(ckanUrl, apiKey);
             Path path = Path.of(fileName);
-            deploy(ckanClient, datasetId, false, null, resourceId, path);
+            doDeploy(ckanClient, path);
         } catch (IOException e) {
             throw new MojoExecutionException("Error uploading file to CKAN", e);
         }
     }
 
-//    private void uploadFileToCkan(File file) throws IOException, InterruptedException, MojoExecutionException {
-//        String boundaryPrefix = "-----------------------------" + new Random().nextLong();
-//        String mimeType = Files.probeContentType(file.toPath());
-//        HttpClient client = HttpClient.newHttpClient();
-//        HttpRequest request = HttpRequest.newBuilder()
-//                .uri(URI.create(ckanUrl + "/api/action/resource_update"))
-//                .header("Authorization", apiKey)
-//                .header("Content-Type", "multipart/form-data; boundary=" + boundaryPrefix)
-//                .POST(HttpRequest.BodyPublishers.ofString(buildMultipartData(file, boundaryPrefix, mimeType)))
-//                .build();
-//
-//        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-//
-//        if (response.statusCode() != 200) {
-//            throw new MojoExecutionException("Failed to upload file to CKAN: " + response.body());
-//        }
-//
-//        getLog().info("File uploaded successfully to CKAN.");
-//    }
-
-    private void addProperty(StringBuilder builder, String boundaryPrefix, String key, String mimeType, String value) {
-        builder
-            .append(boundaryPrefix).append("\r\n")
-            .append("Content-Disposition: form-data; name=\"").append(key).append("\"").append("\r\n")
-            // .append("Content-Type: ").append(mimeType).append("\r\n")
-            .append("\r\n")
-            .append(value)
-            // .append("\r\n")
-            .append("\r\n");
-    }
-
-//    private void addFile(StringBuilder builder, File file) {
-//        builder
-//        	.append("--boundary").append(boundaryPrefix).append("\r\n")
-//        builder.append("Content-Disposition: form-data")
-//                .append("; name=\"upload\"")
-//                .append("; filename=\"").append(file.getName()).append('"')
-//                .append("; id=\"").append(id).append("\"")
-//                .append("\r\n");
-//        builder.append("Content-Type: ").append(mimeType).append("\r\n\r\n");
-//
-//        System.err.println("String: " + builder.toString());
-//
-//        builder.append();
-//        builder.append("\r\n--").append(boundary).append("--\r\n");
-//        return builder.toString();
-//
-//    }
-
-    private String buildMultipartData(File file, String boundaryPrefix, String mimeType) throws IOException {
-        StringBuilder builder = new StringBuilder();
-        addProperty(builder, boundaryPrefix, "id", "text/plain", datasetId);
-
-        builder.append(boundaryPrefix).append("\r\n");
-        builder.append("Content-Disposition: form-data")
-                .append("; name=\"upload\"")
-                .append("; filename=\"").append(file.getName()).append('"')
-                .append("\r\n");
-        builder.append("Content-Type: ").append(mimeType).append("\r\n\r\n");
-
-
-        builder.append(new String(Files.readAllBytes(file.toPath()), "UTF-8"));
-        builder.append("\r\n").append(boundaryPrefix).append("--")
-        .append("\r\n");
-
-        String result = builder.toString();
-        System.err.println("String:\n" + result);
-        return result;
-    }
-
-
     /**
      * Deployment of a file as a CKAN resource.
      */
-    public static void deploy(CkanClient ckanClient, String rawDatasetName, boolean noFileUpload, String targetOrgaId, String resourceId, Path file) throws IOException {
-        // String rawDatasetName = DcatDataset.getLabel(datasetId);
+    public void doDeploy(CkanClient ckanClient, Path file) throws IOException {
+        Log logger = getLog();
 
-        String datasetName = rawDatasetName
+        String datasetName = datasetId
                 .replace(":", "-")
                 .replace(".", "-")
+                .replace(" ", "-")
                 .toLowerCase()
 //                .replaceAll("[0-9]", "x");
                 ;
-        // datasetName = "test";
-        logger.info("Post-processed name to " + datasetName);
+
+        if (logger.isInfoEnabled()) {
+            logger.info("Post-processed name to " + datasetName);
+        }
 
         CkanDataset remoteCkanDataset;
 
@@ -214,7 +158,9 @@ public class CkanUploadMojo extends AbstractMojo {
         try {
             remoteCkanDataset = ckanClient.getDataset(datasetName);
         } catch(CkanNotFoundException e) {
-            logger.info("Dataset does not yet exist");
+            if (logger.isInfoEnabled()) {
+                logger.info("Dataset does not yet exist");
+            }
             remoteCkanDataset = new CkanDataset();
             isDatasetCreationRequired = true;
         } catch(CkanException e) {
@@ -223,17 +169,27 @@ public class CkanUploadMojo extends AbstractMojo {
             isDatasetCreationRequired = true;
         }
 
-//		System.out.println("Before: " + remoteCkanDataset);
+        CkanOrganization ckanOrg = null;
 
-        // Update existing attributes with non-null values
-        //dataset.getName(datasetId);
-        // DcatCkanRdfUtils.convertToCkan(remoteCkanDataset, dataset);
+        if (organizationId != null) {
+            ckanOrg = ckanClient.getOrganization(organizationId);
+        }
+
+        remoteCkanDataset.setAuthor(author);
+
+        if (ckanOrg != null) {
+            remoteCkanDataset.setOrganization(ckanOrg);
+            remoteCkanDataset.setOwnerOrg(ckanOrg.getId());
+        }
+
+        if (logger.isInfoEnabled()) {
+            logger.info("Is creation required? " + isDatasetCreationRequired);
+        }
+
 
         // Use post processed name
 //        remoteCkanDataset.setId(datasetName);
         remoteCkanDataset.setName(datasetName);
-
-        remoteCkanDataset.setOwnerOrg(targetOrgaId);
 
 
         // Append tags
@@ -281,145 +237,155 @@ public class CkanUploadMojo extends AbstractMojo {
 
         // String resourec = dcatDistribution.getTitle();
 
-        logger.info("Deploying distribution " + resourceId);
+        if (logger.isInfoEnabled()) {
+            logger.info("Deploying distribution " + resourceId);
+        }
 
 
 
-            CkanResource remoteCkanResource = createOrUpdateResource(ckanClient, remoteCkanDataset, resourceId);
+        CkanResource remoteCkanResource = createOrUpdateResource(ckanClient, remoteCkanDataset, resourceId);
 
-            if (!noFileUpload) {
-
-                // Check if there is a graph in the dataset that matches the distribution
-                String distributionName = resourceId; // dcatDistribution.getTitle();
-
-                logger.info("Deploying distribution " + distributionName);
-
-
-//                Set<URI> urlsToExistingPaths = resolvedValidUrls.stream()
-//                        .filter(uri ->
-//                                DcatCkanDeployUtils.pathsGet(uri)
-//                                .filter(Files::exists)
-//                                .filter(Files::isRegularFile)
-//                                .isPresent())
-//                        .collect(Collectors.toSet());
+//        boolean noFileUpload = false;
+//        if (!noFileUpload) {
 //
-//                Set<URI> webUrls = Sets.difference(resolvedValidUrls, urlsToExistingPaths);
+//            // Check if there is a graph in the dataset that matches the distribution
+//            String distributionName = resourceId; // dcatDistribution.getTitle();
+//
+//            logger.info("Deploying distribution " + distributionName);
+//
+//
+////                Set<URI> urlsToExistingPaths = resolvedValidUrls.stream()
+////                        .filter(uri ->
+////                                DcatCkanDeployUtils.pathsGet(uri)
+////                                .filter(Files::exists)
+////                                .filter(Files::isRegularFile)
+////                                .isPresent())
+////                        .collect(Collectors.toSet());
+////
+////                Set<URI> webUrls = Sets.difference(resolvedValidUrls, urlsToExistingPaths);
+//
+//            URI uri = file.toUri();
+//            Set<URI> urlsToExistingPaths = Set.of(uri);
+//            Set<URI> webUrls = Set.of();
+//
+//            String downloadFilename = null;
+//            Optional<Path> pathReference = Optional.empty();
+//            Path root = null;
+//            if (urlsToExistingPaths.size() > 0) {
+//                URI fileUrl = urlsToExistingPaths.iterator().next();
+//                pathReference = pathsGet(fileUrl);
+//                downloadFilename = pathReference.get().getFileName().toString();
+//            } else {
+//                // Assume web url - try to download locally and upload
+////                    if (!webUrls.isEmpty()) {
+////                        // TODO This should go through the conjure resource cache
+////                        root = Files.createTempDirectory("http-cache-");
+////                        URI webUrl = webUrls.iterator().next();
+////                        String webUrlPathStr = webUrl.getPath();
+////                        Path tmp =  Paths.get(webUrlPathStr);
+////                        downloadFilename = tmp.getFileName().toString();
+////
+////                        HttpResourceRepositoryFromFileSystemImpl manager = HttpResourceRepositoryFromFileSystemImpl.create(root);
+////
+////                        BasicHttpRequest r = new BasicHttpRequest("GET", webUrl.toASCIIString());
+////        //                r.setHeader(HttpHeaders.ACCEPT, WebContent.contentTypeTurtleAlt2);
+////        //                r.setHeader(HttpHeaders.ACCEPT_ENCODING, "gzip,identity;q=0");
+////
+////                        RdfHttpEntityFile httpEntity = manager.get(r, HttpResourceRepositoryFromFileSystemImpl::resolveRequest);
+////                        pathReference = Optional.ofNullable(httpEntity).map(RdfHttpEntityFile::getAbsolutePath);
+////                    }
+//            }
+//
+//            // TODO This breaks if the downloadURLs are web urls.
+//            // We need a flag whether to do a file upload for web urls, or whether to just update metadata
+//
+////            Optional<Path> pathReference = resolvedValidUrls.stream()
+////                .map(DcatCkanDeployUtils::pathsGet)
+////                .filter(Optional::isPresent)
+////                .map(Optional::get)
+////                .filter(Files::exists)
+////                .findFirst();
+////
 
-                URI uri = file.toUri();
-                Set<URI> urlsToExistingPaths = Set.of(uri);
-                Set<URI> webUrls = Set.of();
+            if (file != null) {
 
-                String downloadFilename = null;
-                Optional<Path> pathReference = Optional.empty();
-                Path root = null;
-                if (urlsToExistingPaths.size() > 0) {
-                    URI fileUrl = urlsToExistingPaths.iterator().next();
-                    pathReference = pathsGet(fileUrl);
-                    downloadFilename = pathReference.get().getFileName().toString();
-                } else {
-                    // Assume web url - try to download locally and upload
-//                    if (!webUrls.isEmpty()) {
-//                        // TODO This should go through the conjure resource cache
-//                        root = Files.createTempDirectory("http-cache-");
-//                        URI webUrl = webUrls.iterator().next();
-//                        String webUrlPathStr = webUrl.getPath();
-//                        Path tmp =  Paths.get(webUrlPathStr);
-//                        downloadFilename = tmp.getFileName().toString();
-//
-//                        HttpResourceRepositoryFromFileSystemImpl manager = HttpResourceRepositoryFromFileSystemImpl.create(root);
-//
-//                        BasicHttpRequest r = new BasicHttpRequest("GET", webUrl.toASCIIString());
-//        //                r.setHeader(HttpHeaders.ACCEPT, WebContent.contentTypeTurtleAlt2);
-//        //                r.setHeader(HttpHeaders.ACCEPT_ENCODING, "gzip,identity;q=0");
-//
-//                        RdfHttpEntityFile httpEntity = manager.get(r, HttpResourceRepositoryFromFileSystemImpl::resolveRequest);
-//                        pathReference = Optional.ofNullable(httpEntity).map(RdfHttpEntityFile::getAbsolutePath);
-//                    }
+                //String filename = distributionName + ".nt";
+                String probedContentType = null;
+                try {
+                    probedContentType = Files.probeContentType(file);
+                } catch (IOException e) {
+                    if (logger.isWarnEnabled()) {
+                        logger.warn("Failed to probe content type of " + file, e);
+                    }
                 }
 
-                // TODO This breaks if the downloadURLs are web urls.
-                // We need a flag whether to do a file upload for web urls, or whether to just update metadata
+                String contentType = Optional.ofNullable(probedContentType).orElse(ContentType.APPLICATION_OCTET_STREAM.toString());
 
-    //            Optional<Path> pathReference = resolvedValidUrls.stream()
-    //                .map(DcatCkanDeployUtils::pathsGet)
-    //                .filter(Optional::isPresent)
-    //                .map(Optional::get)
-    //                .filter(Files::exists)
-    //                .findFirst();
-    //
+                String finalDownloadFileName = downloadFileName != null
+                        ? downloadFileName
+                        : file.getFileName().toString();
 
-                if (pathReference.isPresent()) {
-                    Path path = pathReference.get();
-
-                    //String filename = distributionName + ".nt";
-                    String probedContentType = null;
-                    try {
-                        probedContentType = Files.probeContentType(path);
-                    } catch (IOException e) {
-                        logger.warn("Failed to probe content type of " + path, e);
-                    }
-
-                    String contentType = Optional.ofNullable(probedContentType).orElse(ContentType.APPLICATION_OCTET_STREAM.toString());
 
 //	                if (!noFileUpload) {
 
-                    logger.info("Uploading file " + path);
-                    CkanResource tmp = uploadFile(
-                            ckanClient,
-                            remoteCkanDataset.getName(),
-                            remoteCkanResource.getId(),
-                            path.toString(),
-                            ContentType.create(contentType),
-                            downloadFilename);
+                logger.info("Uploading file " + file);
+                CkanResource tmp = uploadFile(
+                        ckanClient,
+                        remoteCkanDataset.getName(),
+                        remoteCkanResource.getId(),
+                        file.toString(),
+                        ContentType.create(contentType),
+                        finalDownloadFileName);
 
-                    tmp.setOthers(remoteCkanResource.getOthers());
-                    int maxRetries = 5;
-                    for(int i = 0; i < maxRetries; ++i) {
-                        try {
-                            remoteCkanResource = ckanClient.updateResource(tmp);
-                            break;
-                        } catch(Exception e) {
-                            if(i + 1 < maxRetries) {
-                                logger.warn("Failed to update resource, retrying " + (i + 1) + "/" + maxRetries);
-                            } else {
-                                logger.error("Giving up on updating a resource after " + maxRetries, e);
-                            }
+                tmp.setName(remoteCkanDataset.getName());
+                tmp.setOthers(remoteCkanResource.getOthers());
+                int maxRetries = 5;
+                for(int i = 0; i < maxRetries; ++i) {
+                    try {
+                        remoteCkanResource = ckanClient.updateResource(tmp);
+                        break;
+                    } catch(Exception e) {
+                        if(i + 1 < maxRetries) {
+                            logger.warn("Failed to update resource, retrying " + (i + 1) + "/" + maxRetries);
+                        } else {
+                            logger.error("Giving up on updating a resource after " + maxRetries, e);
                         }
                     }
+                }
 //					remoteCkanResource.setUrl(tmp.getUrl());
 //					remoteCkanResource.setUrlType(tmp.getUrlType());
 
-                    //remoteCkanResource.set
-                    //remoteCkanResource = ckanClient.getResource(tmp.getId());
-                    // Run the metadata update again
+                //remoteCkanResource.set
+                //remoteCkanResource = ckanClient.getResource(tmp.getId());
+                // Run the metadata update again
 
-                    // This works, but retrieves the whole dataset on each resource, which we want to avoid
+                // This works, but retrieves the whole dataset on each resource, which we want to avoid
 //					if(false) {
 //						remoteCkanDataset = ckanClient.getDataset(remoteCkanDataset.getId());
 //						remoteCkanResource = createOrUpdateResource(ckanClient, remoteCkanDataset, dataset, dcatDistribution);
 //					}
 
-                    //DcatCkanRdfUtils.convertToCkan(remoteCkanResource, dcatDistribution);
+                //DcatCkanRdfUtils.convertToCkan(remoteCkanResource, dcatDistribution);
 
 
-                    // FIXME upload currently destroys custom tags, hence we update the metadata again
-                    //remoteCkanResource = ckanClient.updateResource(remoteCkanResource);
+                // FIXME upload currently destroys custom tags, hence we update the metadata again
+                //remoteCkanResource = ckanClient.updateResource(remoteCkanResource);
 
 
 //	                } else {
 //	                    logger.info("File upload disabled. Skipping " + path);
 //	                }
-                }
-
-                // Resource newDownloadUrl = ResourceFactory.createResource(remoteCkanResource.getUrl());
-
-                //org.aksw.jena_sparql_api.rdf.collections.ResourceUtils.setProperty(dcatDistribution, DCAT.downloadURL, newDownloadUrl);
-
-                if (root != null) {
-                    logger.info("Removing directory recursively: " + root);
-                    // MoreFiles.deleteRecursively(root);
-                }
             }
+
+            // Resource newDownloadUrl = ResourceFactory.createResource(remoteCkanResource.getUrl());
+
+            //org.aksw.jena_sparql_api.rdf.collections.ResourceUtils.setProperty(dcatDistribution, DCAT.downloadURL, newDownloadUrl);
+
+//            if (root != null) {
+//                logger.info("Removing directory recursively: " + root);
+//                // MoreFiles.deleteRecursively(root);
+//            }
+//        }
     }
 
     /**
@@ -473,6 +439,7 @@ public class CkanUploadMojo extends AbstractMojo {
             isResourceCreationRequired = true;
 
             remote = new CkanResource(null, ckanDataset.getName());
+            remote.setId(resourceId);
             remote.setName(resName);
         }
 
@@ -484,6 +451,8 @@ public class CkanUploadMojo extends AbstractMojo {
         } else {
             remote = ckanClient.updateResource(remote);
         }
+
+        System.err.println("resource name: " + remote.getName());
 
         return remote;
     }
@@ -501,7 +470,7 @@ public class CkanUploadMojo extends AbstractMojo {
      * @param downloadFilename The name under which the uploaded file will be available for download.
      * @return The CkanResource for the create or updated upload.
      */
-    public static CkanResource uploadFile(
+    public CkanResource uploadFile(
             CkanClient ckanClient,
             String datasetName,
             String resourceId,
@@ -511,8 +480,12 @@ public class CkanUploadMojo extends AbstractMojo {
             ContentType contentType,
             String downloadFilename)
     {
+        Log logger = getLog();
+
         Path path = Paths.get(srcFilename);
-        logger.info("Updating ckan resource " + resourceId + " with content from " + path.toAbsolutePath());
+        if (logger.isInfoEnabled()) {
+            logger.info("Updating ckan resource " + resourceId + " with content from " + path.toAbsolutePath());
+        }
 
         contentType = contentType == null ? ContentType.DEFAULT_TEXT : contentType;
         downloadFilename = downloadFilename == null ? path.getFileName().toString() : downloadFilename;
@@ -532,6 +505,7 @@ public class CkanUploadMojo extends AbstractMojo {
             HttpPost postRequest;
             HttpEntity reqEntity = MultipartEntityBuilder.create()
                     .addPart("id", new StringBody(resourceId, ContentType.TEXT_PLAIN))
+                    .addPart("name", new StringBody(resourceId, ContentType.TEXT_PLAIN))
                     //.addPart("name", new StringBody(resourceName, ContentType.TEXT_PLAIN))
                     .addPart("package_id", new StringBody(datasetName, ContentType.TEXT_PLAIN))
                     .addPart("upload", new FileBody(file, contentType, downloadFilename)) // , ContentType.APPLICATION_OCTET_STREAM))
@@ -561,7 +535,9 @@ public class CkanUploadMojo extends AbstractMojo {
             String status =  new BufferedReader(new InputStreamReader(response.getEntity().getContent()))
                     .lines().collect(Collectors.joining("\n"));
 
-            logger.info("Upload status: " + statusCode + "\n" + status);
+            if (logger.isInfoEnabled()) {
+                logger.info("Upload status: " + statusCode + "\n" + status);
+            }
 
             // TODO We could get rid of this extra request by processing the reply of the upload
             CkanResource result = ckanClient.getResource(resourceId);
@@ -583,4 +559,78 @@ public class CkanUploadMojo extends AbstractMojo {
         }
         return result;
     }
+
+
+
+//  private void uploadFileToCkan(File file) throws IOException, InterruptedException, MojoExecutionException {
+//  String boundaryPrefix = "-----------------------------" + new Random().nextLong();
+//  String mimeType = Files.probeContentType(file.toPath());
+//  HttpClient client = HttpClient.newHttpClient();
+//  HttpRequest request = HttpRequest.newBuilder()
+//          .uri(URI.create(ckanUrl + "/api/action/resource_update"))
+//          .header("Authorization", apiKey)
+//          .header("Content-Type", "multipart/form-data; boundary=" + boundaryPrefix)
+//          .POST(HttpRequest.BodyPublishers.ofString(buildMultipartData(file, boundaryPrefix, mimeType)))
+//          .build();
+//
+//  HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+//
+//  if (response.statusCode() != 200) {
+//      throw new MojoExecutionException("Failed to upload file to CKAN: " + response.body());
+//  }
+//
+//  getLog().info("File uploaded successfully to CKAN.");
+//}
+
+private void addProperty(StringBuilder builder, String boundaryPrefix, String key, String mimeType, String value) {
+  builder
+      .append(boundaryPrefix).append("\r\n")
+      .append("Content-Disposition: form-data; name=\"").append(key).append("\"").append("\r\n")
+      // .append("Content-Type: ").append(mimeType).append("\r\n")
+      .append("\r\n")
+      .append(value)
+      // .append("\r\n")
+      .append("\r\n");
+}
+
+//private void addFile(StringBuilder builder, File file) {
+//  builder
+//  	.append("--boundary").append(boundaryPrefix).append("\r\n")
+//  builder.append("Content-Disposition: form-data")
+//          .append("; name=\"upload\"")
+//          .append("; filename=\"").append(file.getName()).append('"')
+//          .append("; id=\"").append(id).append("\"")
+//          .append("\r\n");
+//  builder.append("Content-Type: ").append(mimeType).append("\r\n\r\n");
+//
+//  System.err.println("String: " + builder.toString());
+//
+//  builder.append();
+//  builder.append("\r\n--").append(boundary).append("--\r\n");
+//  return builder.toString();
+//
+//}
+
+private String buildMultipartData(File file, String boundaryPrefix, String mimeType) throws IOException {
+  StringBuilder builder = new StringBuilder();
+  addProperty(builder, boundaryPrefix, "id", "text/plain", datasetId);
+
+  builder.append(boundaryPrefix).append("\r\n");
+  builder.append("Content-Disposition: form-data")
+          .append("; name=\"upload\"")
+          .append("; filename=\"").append(file.getName()).append('"')
+          .append("\r\n");
+  builder.append("Content-Type: ").append(mimeType).append("\r\n\r\n");
+
+
+  builder.append(new String(Files.readAllBytes(file.toPath()), "UTF-8"));
+  builder.append("\r\n").append(boundaryPrefix).append("--")
+  .append("\r\n");
+
+  String result = builder.toString();
+  System.err.println("String:\n" + result);
+  return result;
+}
+
+
 }
