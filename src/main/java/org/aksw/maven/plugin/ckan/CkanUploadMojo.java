@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.License;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -93,17 +92,32 @@ public class CkanUploadMojo extends AbstractMojo {
 //    @Parameter(property = "ckan.apiKey", required = true)
 //    private String apiKey;
 
-    @Parameter(property = "ckan.fileName", required = true)
-    private String fileName;
+    /** The path to the file which to upload */
+    @Parameter(property = "ckan.uploadPath", required = true)
+    private String uploadPath;
 
+    /** Defaults to the file name of the path provided for {@link #fileName} */
     @Parameter(property = "ckan.downloadFileName", required = false)
     private String downloadFileName;
 
     @Parameter(property = "ckan.datasetId", required = true)
     private String datasetId;
 
-    @Parameter(property = "ckan.resourceId", defaultValue = "${project.artifactId}", required = true)
+    // https://ckan.example.org/dataset/{datasetHash}/resource/
+    // {resourceId:disasters-0.20240218.1738}/download/{downloadFileName:disasters-0.20240218.1738.nt.bz2}
+
+    /**
+     * The resource id becomes a part of the download URL.
+     * Unlike the resourceName it is typically not displayed to humans.
+     */
+    @Parameter(property = "ckan.resourceId", defaultValue = "${project.artifactId}-${project.version}", required = true)
     private String resourceId;
+
+    @Parameter(property = "ckan.resourceName", defaultValue = "${project.artifactId}-${project.version}", required = true)
+    private String resourceName;
+
+    @Parameter(property = "ckan.resourceFormat", required = false)
+    private String resourceFormat;
 
     @Parameter(property = "ckan.organizationId", required = false)
     private String organizationId;
@@ -121,9 +135,10 @@ public class CkanUploadMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
-        File file = new File(fileName);
-        if (!file.exists()) {
-            throw new MojoExecutionException("File " + fileName + " does not exist.");
+        Path path = Path.of(uploadPath);
+        // File file = new File(upleadPath);
+        if (!Files.exists(path)) {
+            throw new MojoExecutionException("File " + path.toAbsolutePath() + " does not exist.");
         }
 
         try {
@@ -138,7 +153,6 @@ public class CkanUploadMojo extends AbstractMojo {
             }
 
             CkanClient ckanClient = new CkanClient(ckanUrl, apiKey);
-            Path path = Path.of(fileName);
             doDeploy(ckanClient, path);
         } catch (IOException e) {
             throw new MojoExecutionException("Error uploading file to CKAN", e);
@@ -373,11 +387,12 @@ public class CkanUploadMojo extends AbstractMojo {
                         ckanClient,
                         remoteCkanDataset.getName(),
                         remoteCkanResource.getId(),
-                        file.toString(),
+                        file,
                         ContentType.create(contentType),
                         finalDownloadFileName);
 
-                tmp.setName(remoteCkanDataset.getName());
+                tmp.setFormat(resourceFormat);
+                // tmp.setName(remoteCkanDataset.getName());
                 tmp.setOthers(remoteCkanResource.getOthers());
                 int maxRetries = 5;
                 for(int i = 0; i < maxRetries; ++i) {
@@ -453,7 +468,7 @@ public class CkanUploadMojo extends AbstractMojo {
         String resName = resourceId;
 
         if(resName == null) {
-            new RuntimeException("DCAT Distribution / CKAN Resource must have a name i.e. public id");
+            throw new RuntimeException("DCAT Distribution / CKAN Resource must have a name i.e. public id");
         }
 
         boolean isResourceCreationRequired = false;
@@ -516,19 +531,19 @@ public class CkanUploadMojo extends AbstractMojo {
             String resourceId,
             //String resourceName,
             //boolean isResourceCreationRequired,
-            String srcFilename,
+            Path path,
             ContentType contentType,
             String downloadFilename)
     {
         Log logger = getLog();
 
-        Path path = Paths.get(srcFilename);
-        if (logger.isInfoEnabled()) {
-            logger.info("Updating ckan resource " + resourceId + " with content from " + path.toAbsolutePath());
-        }
+//        Path path = Paths.get(srcFilename);
+//        if (logger.isInfoEnabled()) {
+//            logger.info("Updating ckan resource " + resourceId + " with content from " + path.toAbsolutePath());
+//        }
 
         contentType = contentType == null ? ContentType.DEFAULT_TEXT : contentType;
-        downloadFilename = downloadFilename == null ? path.getFileName().toString() : downloadFilename;
+        // downloadFilename = downloadFilename == null ? path.getFileName().toString() : downloadFilename;
 
         String apiKey = ckanClient.getCkanToken();
         String HOST = ckanClient.getCatalogUrl();// "http://ckan.host.com";
@@ -555,7 +570,7 @@ public class CkanUploadMojo extends AbstractMojo {
                     // .addPart("notes", new StringBody("notes",ContentType.TEXT_PLAIN))
                     // .addPart("author",new StringBody("AuthorName",ContentType.TEXT_PLAIN))
                     // .addPart("author_email",new StringBody("AuthorEmail",ContentType.TEXT_PLAIN))
-                    // .addPart("title",new StringBody("title",ContentType.TEXT_PLAIN))
+                    // .addPart("title",new StringBody(resourceId,ContentType.TEXT_PLAIN))
                     // .addPart("description",new StringBody("file
                     // Desc"+date,ContentType.TEXT_PLAIN))
                     .build();

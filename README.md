@@ -39,8 +39,10 @@ It is strongly advised to [encrypt your passwords](https://maven.apache.org/guid
           <ckanUrl>https://the.ckan.server/</ckanUrl>
           <serverId>the.ckan.serverId</serverId>
           <datasetId>Your Dataset</datasetId>
-          <resourceId>${project.artifactId}</resourceId>
-          <fileName>${project.build.directory}/YOUR_FILE.XYZ</fileName>
+          <uploadPath>${project.build.directory}/YOUR_FILE.XYZ</uploadPath>
+          <resourceId>${project.artifactId}-${project.version}.XYZ</resourceId>
+          <resourceName>Download of ${project.artifactId}-${project.version} in format XYZ</resourceName>
+          <downloadFileName>data.XYZ</downloadFileName>
           <organizationId>TheOrganization</organizationId>
           <author>TheAuthor</author>
         </configuration>
@@ -48,6 +50,9 @@ It is strongly advised to [encrypt your passwords](https://maven.apache.org/guid
     </executions>            
 </plugin>
 ```
+
+* In practice, it seems reasonable to use the same value for `resourceId`, `resourceName` and `downloadFileName`
+using the the pattern `${project.artifactId}-${project.version}.XYZ`.
 
 ## Notes
 
