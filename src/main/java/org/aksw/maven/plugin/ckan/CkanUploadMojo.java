@@ -1,18 +1,3 @@
-/*
- * Copyright 2013 Luca Tagliani
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.aksw.maven.plugin.ckan;
 
 import java.io.BufferedReader;
@@ -27,6 +12,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -125,6 +111,29 @@ public class CkanUploadMojo extends AbstractMojo {
     @Parameter(property = "ckan.author", required = false)
     private String author;
 
+    /**
+     * The API key should <b>NEVER</b> be used. It only exists to ease debugging
+     * and testing.
+     * The clean way to supply a CKAN API key is to add the following section to
+     * your maven settings.xml:
+     *
+     * <pre>
+     * &lt;settings&gt;
+     *   &lt;servers&gt;
+     *     &lt;server&gt;
+     *       &lt;id&gt;ckan.server.id&lt;/id&gt;
+     *       &lt;username&gt;your-user-name&lt;/username&gt;
+     *       &lt;password&gt;{your-encryted-ckan-api-key}&lt;/password&gt;
+     *     &lt;/server&gt;
+     *   &lt;/servers&gt;
+     * &lt;/settings&gt;
+     * <pre>
+     *
+     */
+    @Parameter(property = "ckan.apiKey", required = false)
+    private String apiKey;
+
+
 //    @Parameter(property = "ckan.version", defaultValue = "${project.version}", required = true)
 //    private String version;
 
@@ -135,8 +144,9 @@ public class CkanUploadMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
+        Objects.requireNonNull(uploadPath, "Path to the file to be uploaded must not be null");
+
         Path path = Path.of(uploadPath);
-        // File file = new File(upleadPath);
         if (!Files.exists(path)) {
             throw new MojoExecutionException("File " + path.toAbsolutePath() + " does not exist.");
         }
@@ -144,15 +154,17 @@ public class CkanUploadMojo extends AbstractMojo {
         try {
             Server server = settings.getServer(serverId);
 
-            String apiKey = null;
-            if (server != null) {
-                SettingsDecryptionResult result = decrypter.decrypt(new DefaultSettingsDecryptionRequest(server));
-                server = result.getServer();
-                // Assuming the API key is stored in the password field
-                apiKey = server.getPassword();
+            String $apiKey = this.apiKey;
+            if ($apiKey == null) {
+                if (server != null) {
+                    SettingsDecryptionResult result = decrypter.decrypt(new DefaultSettingsDecryptionRequest(server));
+                    server = result.getServer();
+                    // Assuming the API key is stored in the password field
+                    $apiKey = server.getPassword();
+                }
             }
 
-            CkanClient ckanClient = new CkanClient(ckanUrl, apiKey);
+            CkanClient ckanClient = new CkanClient(ckanUrl, $apiKey);
             doDeploy(ckanClient, path);
         } catch (IOException e) {
             throw new MojoExecutionException("Error uploading file to CKAN", e);
@@ -203,6 +215,12 @@ public class CkanUploadMojo extends AbstractMojo {
             remoteCkanDataset = new CkanDataset();
             isDatasetCreationRequired = true;
         }
+
+        // Unset groups because there seems to be some serialization issue when trying to post
+        // a request with them:
+        // com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Invalid type definition for type `eu.trentorise.opendata.jackan.model.CkanGroup`: Cannot refine serialization type [simple type, class eu.trentorise.opendata.jackan.model.CkanGroup] into eu.trentorise.opendata.jackan.CkanClient$GroupForDatasetPosting; types not related (through reference chain: eu.trentorise.opendata.jackan.model.CkanDataset["groups"]->java.util.ArrayList[0])
+        // at com.fasterxml.jackson.databind.exc.InvalidDefinitionException.from(InvalidDefinitionException.java:72)
+        remoteCkanDataset.setGroups(null);
 
         CkanOrganization ckanOrg = null;
 
@@ -387,6 +405,7 @@ public class CkanUploadMojo extends AbstractMojo {
                         ckanClient,
                         remoteCkanDataset.getName(),
                         remoteCkanResource.getId(),
+                        remoteCkanResource.getName(),
                         file,
                         ContentType.create(contentType),
                         finalDownloadFileName);
@@ -493,8 +512,9 @@ public class CkanUploadMojo extends AbstractMojo {
         if(remote == null) {
             isResourceCreationRequired = true;
 
-            remote = new CkanResource(null, ckanDataset.getName());
-            remote.setId(resourceId);
+            // remote = new CkanResource(null, ckanDataset.getName());
+            remote = new CkanResource(null, ckanDataset.getId());
+            // remote.setId(resourceId);
             remote.setName(resName);
         }
 
@@ -529,7 +549,7 @@ public class CkanUploadMojo extends AbstractMojo {
             CkanClient ckanClient,
             String datasetName,
             String resourceId,
-            //String resourceName,
+            String resourceName,
             //boolean isResourceCreationRequired,
             Path path,
             ContentType contentType,
@@ -560,8 +580,8 @@ public class CkanUploadMojo extends AbstractMojo {
             HttpPost postRequest;
             HttpEntity reqEntity = MultipartEntityBuilder.create()
                     .addPart("id", new StringBody(resourceId, ContentType.TEXT_PLAIN))
-                    .addPart("name", new StringBody(resourceId, ContentType.TEXT_PLAIN))
-                    //.addPart("name", new StringBody(resourceName, ContentType.TEXT_PLAIN))
+                    // .addPart("name", new StringBody(resourceId, ContentType.TEXT_PLAIN))
+                    .addPart("name", new StringBody(resourceName, ContentType.TEXT_PLAIN))
                     .addPart("package_id", new StringBody(datasetName, ContentType.TEXT_PLAIN))
                     .addPart("upload", new FileBody(file, contentType, downloadFilename)) // , ContentType.APPLICATION_OCTET_STREAM))
                     // .addPart("file", cbFile)

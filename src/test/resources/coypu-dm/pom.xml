@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.aksw.maven.plugins.test</groupId>
+	<artifactId>test-ckan-maven-plugin</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+
+	<build>
+		<plugins>
+          <plugin>
+              <groupId>org.aksw.maven.plugins</groupId>
+              <artifactId>ckan-maven-plugin</artifactId>
+              <version>0.0.1-SNAPSHOT</version>
+                  <configuration>
+                    <ckanUrl>http://localhost:5000</ckanUrl>
+                    <serverId>aklakan.ckan</serverId>
+                    <datasetId>TestData</datasetId>
+                    <uploadPath>src/test/resources/coypu-dm/data.nt</uploadPath>
+                    <!-- <resourceId>test-0.0.0.nt</resourceId>-->
+                    <resourceId>testres</resourceId>
+                    <resourceName>test-0.0.0.nt</resourceName>
+                    <resourceFormat>nt</resourceFormat>
+                    <downloadFileName>test-0.0.0.nt</downloadFileName>
+                    <organizationId>coypu</organizationId>
+                    <author>Claus Stadler</author>
+                    <apiKey>SECRET</apiKey>
+                  </configuration>
+              <executions>
+                <execution>
+				  <!--
+                  <id>ckan-upload</id>
+                  <phase>deploy</phase>
+                  <goals>
+                    <goal>upload</goal>
+                  </goals>
+                  -->
+                </execution>
+              </executions>
+          </plugin>
+
+		</plugins>
+	</build>
+</project>

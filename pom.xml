@@ -64,6 +64,9 @@
 		<maven-gpg-plugin.version>3.1.0</maven-gpg-plugin.version>
 
 		<nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
+
+		<maven-plugin-testing-harness.version>3.3.0</maven-plugin-testing-harness.version>
+		<junit.version>4.13.2</junit.version>
 	</properties>
 
 	<prerequisites>
@@ -375,12 +378,34 @@
 			<version>${jackan.version}</version>
 		</dependency>
 
+		<!-- Unit testing -->
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>${junit.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.maven.plugin-testing</groupId>
+			<artifactId>maven-plugin-testing-harness</artifactId>
+			<version>${maven-plugin-testing-harness.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Needed to make maven-plugin-testing-harness work -->
+		<dependency>
+			<groupId>org.apache.maven</groupId>
+			<artifactId>maven-compat</artifactId>
+			<version>${maven-api.version}</version>
+			<scope>test</scope>
+		</dependency>
+
 		<!-- Experimental; may be dropped or go to a different plugin -->
-<!--		<dependency>-->
-<!--			<groupId>org.apache.maven.wagon</groupId>-->
-<!--			<artifactId>wagon-provider-api</artifactId>-->
-<!--			<version>3.5.3</version>-->
-<!--		</dependency>-->
+		<!--		<dependency>-->
+		<!--			<groupId>org.apache.maven.wagon</groupId>-->
+		<!--			<artifactId>wagon-provider-api</artifactId>-->
+		<!--			<version>3.5.3</version>-->
+		<!--		</dependency>-->
 	</dependencies>
 
 
