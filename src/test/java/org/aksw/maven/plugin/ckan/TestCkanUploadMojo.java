@@ -5,6 +5,7 @@ import java.io.File;
 import org.apache.maven.plugin.Mojo;
 import org.apache.maven.plugin.testing.MojoRule;
 import org.apache.maven.project.MavenProject;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
