@@ -540,7 +540,7 @@ public class CkanUploadMojo extends AbstractMojo {
      * @param ckanClient The CKAN client instance.
      * @param datasetName The name of the CKAN dataset to which to upload the file.
      * @param resourceId The name of the resource to which to upload the dataset (w.r.t. to the dataset).
-     * @param srcFilename The filename what to upload.
+     * @param resourceName The filename what to upload.
      * @param contentType The content type for the upload.
      * @param downloadFilename The name under which the uploaded file will be available for download.
      * @return The CkanResource for the create or updated upload.
