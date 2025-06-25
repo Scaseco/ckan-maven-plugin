@@ -10,8 +10,8 @@
 	<packaging>maven-plugin</packaging>
 
 	<name>CKAN Maven Plugin</name>
-	<url></url>
-	<description>Maven plugin for executing SPARQL queries on RDF resources</description>
+	<url>https://github.com/Scaseco/ckan-maven-plugin</url>
+	<description>Maven plugin for publishing artifacts to CKAN</description>
 	<inceptionYear>2023</inceptionYear>
 
 	<scm>
